@@ -2,17 +2,39 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-
 import os
-if not os.path.exists('model.pkl'):
-    import subprocess
-    import sys
-    subprocess.run([sys.executable, 'train_model.py'], check=True)
-    
-model = pickle.load(open('model.pkl', 'rb'))
-scaler = pickle.load(open('scaler.pkl', 'rb'))
-imputer = pickle.load(open('imputer.pkl', 'rb'))
-feature_columns = pickle.load(open('feature_columns.pkl', 'rb'))
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+
+@st.cache_resource
+def load_or_train_model():
+    if os.path.exists('model.pkl'):
+        model = pickle.load(open('model.pkl', 'rb'))
+        scaler = pickle.load(open('scaler.pkl', 'rb'))
+        imputer = pickle.load(open('imputer.pkl', 'rb'))
+        feature_columns = pickle.load(open('feature_columns.pkl', 'rb'))
+    else:
+        df = pd.read_csv('city_day.csv')
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.drop(columns=['Xylene'], inplace=True)
+        df.dropna(subset=['AQI'], inplace=True)
+        model_df = df.drop(columns=['Date', 'AQI_Bucket', 'Benzene', 'Toluene'])
+        model_df = pd.get_dummies(model_df, columns=['City'], drop_first=True)
+        X = model_df.drop(columns=['AQI'])
+        y = model_df['AQI']
+        imputer = SimpleImputer(strategy='median')
+        X_imputed = imputer.fit_transform(X)
+        scaler = StandardScaler()
+        scaler.fit(X_imputed)
+        X_train, X_test, y_train, y_test = train_test_split(X_imputed, y, test_size=0.2, random_state=42)
+        model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+        model.fit(X_train, y_train)
+        feature_columns = list(X.columns)
+    return model, scaler, imputer, feature_columns
+
+model, scaler, imputer, feature_columns = load_or_train_model()
 
 st.set_page_config(page_title="India AQI Predictor", page_icon="🌫️", layout="centered")
 
