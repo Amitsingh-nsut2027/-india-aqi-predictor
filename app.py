@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import pickle
 
+import os
+if not os.path.exists('model.pkl'):
+    import subprocess
+    import sys
+    subprocess.run([sys.executable, 'train_model.py'], check=True)
+    
 model = pickle.load(open('model.pkl', 'rb'))
 scaler = pickle.load(open('scaler.pkl', 'rb'))
 imputer = pickle.load(open('imputer.pkl', 'rb'))
